@@ -7,11 +7,8 @@ This repository contains code for processing VCF files characterizing somatic fe
 ## Requirements
 
 ## Quick data overview
-
-VCF files for tumor WES in Black AACES/NCOCS cases following Strelka variant calling 
-Downloaded from Seven Bridges on October 16th, 2022
-No filtering or annotation other than Strelka baseline filtering paramters applied
-
+* `./data/somatic/vcfs/master/*`
+  * VCF files following tumor WES and Strelka variant calling in the 256 Black AACES/NCOCS analytic cases, no filtering other than Strelka baseline parameteres applied (downloaded from Seven Bridges on October 16th, 2022)
 ## Quick code overview
 
 ## Analysis and results
