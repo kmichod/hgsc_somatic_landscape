@@ -1,8 +1,0 @@
-Contains slurm script and code for running VCF parser. 
-VCF parser is a tool developed and mainted by the HCI bioinformatics core which annotates VCF files and filtering variants based on select criteria.
-Defult parameters were used for all runs with the exception of the following parameters which were modified based on the tiered confidence level. 
-- High confidence dataset (***link to high confidence vcfs***) was filtered using the following criteria:
-  1. Read depth (-d) ≥ 30 
-  2. tumor AF (-m) ≥ 0.15
-  3. BKZ score (-z) ≥ 4
-  4. Number of alt observations (-w) ≥4
