@@ -1,5 +1,10 @@
-# HGSC somatic landscape
-Analysis pipeline for high-grade serous ovarian cancer somatic landscape including VCF processing and significantly mutated genes analysis
+# HGSC somatic landscape paper
+Analysis performed for high-grade serous ovarian cancer somatic landscape paper including:
+- VCF processing
+- MutSig2CV
+- Differential expression analysis for identified genes
+- COSMIC refitting
+- KM curves and Cox models
 
 ## Overview
 This repository contains code for processing VCF files characterizing somatic features in high-grade serous ovarian cancer using previously published methods including:
