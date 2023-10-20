@@ -1,8 +1,5 @@
 #!/bin/bash
 
-\
-
-
 set -e
 
 module load vep samtools
