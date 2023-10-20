@@ -1,12 +1,12 @@
 #Determine samples passing sequencing qc
-#Author: Katheirne Lawson-Michod
+#Author: Katherine Lawson-Michod
 #Date: February 22nd, 2023
-#Updated: September 20th, 2023
+#Updated: October 
 
 library(tidyr)
 library(dplyr)
 
-directory <- "/Users/kayleighlawson-michod/Library/CloudStorage/OneDrive-UniversityofUtah/Doherty/AACES_Tissue_Grant/1.Writing/GitHub" #set working directory
+directory <- "hgsc_somatic_landscape" #set working directory
 
 #Read in qc stats for tumor WES
 qc_stats_black_cases <- readxl::read_xlsx(file.path(directory, "reference_data/qc_stats/qcStats17Feb2022_new_old_master.xlsx"))
