@@ -1,17 +1,5 @@
 #!/bin/bash
 
-#SBATCH --account=doherty
-
-#SBATCH --partition=redwood
-
-#SBATCH -N 1
-
-#SBATCH -t 72:00:00
-
-#Lawson-Michod
-
-
-
 set -e
 
 module load vep samtools
