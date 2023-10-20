@@ -1,15 +1,5 @@
 #!/bin/bash
 
-#SBATCH --account=doherty
-
-#SBATCH --partition=redwood
-
-#SBATCH -N 1
-
-#SBATCH -t 72:00:00
-
-#Lawson-Michod
-
 module load vep samtools
 
 start=$(date +'%s'); rm -f FAILED COMPLETE QUEUED; touch STARTED
