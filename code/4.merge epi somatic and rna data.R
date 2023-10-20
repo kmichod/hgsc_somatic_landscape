@@ -148,7 +148,7 @@ rnaseq_rename <- rnaseq_raw %>%
   left_join(sampleidmapping, by = c("sample_id" = "ID")) %>%
   mutate(sample_id = ifelse(
     Dataset == "aaces.eset", suid, sample_id), 
-    ClusterK4_kmeans = recode(ClusterK4_kmeans, "1" = "Mesenchymal", "2" = "Proliferative", "3" = "Immunoreactive", "4" = "Differentiated"),
+    ClusterK4_kmeans = recode(ClusterK4_kmeans, "1" = "C1.MES", "2" = "C5.PRO", "3" = "C2.IMM", "4" = "C4.DIF"),
     Dataset = recode(Dataset, "aaces.eset" = "Schildkraut-B", "TCGA" = "TCGA-W")) %>%
   rename(Study = Dataset) %>%
   select(c(Study, ClusterK4_kmeans, sample_id)) %>%
