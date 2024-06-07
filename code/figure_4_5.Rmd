@@ -1,0 +1,580 @@
+---
+title: "Figure 4 and 4"
+author: "Katherine Lawson-Michod"
+output: html_document
+
+---
+
+
+```{r }
+
+library(readxl)
+library(ggpubr)
+library(ggpattern)
+library(ggpubr)
+library(grid)
+
+directory <- "~/hgsc_somatic_landscape_paper" #set working directory
+source(file.path(directory, "code/2.utils.R"))
+
+```
+
+# Read in COSMIC results 
+```{r}
+
+sbs_tissue_black_long <- readxl::read_xlsx(file.path(directory, "/results/cosmic/sbs_tissue_black_long.xlsx"))
+sbs_tissue_black <- readxl::read_xlsx(file.path(directory, "/results/cosmic/sbs_tissue_black.xlsx"))
+sbs_tcga_white_nature_long <- readxl::read_xlsx(file.path(directory, "/results/cosmic/sbs_tcga_white_nature_long.xlsx"))
+sbs_tcga_white_nature <- readxl::read_xlsx(file.path(directory, "/results/cosmic/sbs_tcga_white_nature.xlsx"))
+
+```
+
+# Define signatures with known eitiology based on COSMIC SBS v3.3 and define list of signatures exluded in TCGA's analysis
+
+```{r}
+
+known_eitiology_sbs <- c("Age", "MMRD", "POLE", "HRD", "BER", "Chemotherapy", "Immunosuppressants", "APOBEC", "Tobacco", "UV", "AA", "Colibactin", "Artifact", "Lymphoid")
+signatures_of_interest <- c("Age", "MMRD", "POLE", "HRD", "BER", "Chemotherapy", "Immunosuppressants", "APOBEC", "Tobacco", "AA", "Colibactin", "Artifact", "UV")
+setdiff(known_eitiology_sbs, signatures_of_interest)
+all_signatures <- append(unique(sbs_tcga_white_nature_long$eitiology), unique(sbs_tissue_black_long$eitiology))
+signatures_missing_tcga <- setdiff(unique(sbs_tissue_black_long$signature), unique(sbs_tcga_white_nature_long$signature))
+
+```
+
+# Define colors for plots
+
+```{r}
+
+vc_cols = c("#000000", "#966919", "#e7cba9", "#7c9bb9", "#887ecb", "#aa0011", "#0059b2", "#c96552", "#6c8c86", "#C9D487")
+names(vc_cols) = c('Age', 'UV', 'HRD', 'Chemotherapy', 'BER', 'POLE',  'APOBEC', 'Tobacco', 'Artifact', 'Immunosuppressants')
+
+```
+
+
+# Define a data frame that has the frequency of individuals with at least 10 mutations attributed to a given signature 
+
+```{r}
+
+tcga_10count <- sbs_tcga_white_nature_long %>% 
+  filter(activity > 9) %>% 
+  distinct(Samples, eitiology) %>% 
+  group_by(eitiology) %>% 
+  count()
+tcga_10count <- tcga_10count %>% 
+  rename(n_tcga = n) %>% 
+  mutate(perc_tcga = round(((n_tcga/176)*100), 2))
+tcga_10count_bind <- tcga_10count %>% 
+  mutate(study = "TCGA-W") %>% 
+  rename(perc = perc_tcga) %>% 
+  select(-c("n_tcga")) 
+
+tissue_10count <- sbs_tissue_black_long %>% 
+  filter(activity > 9) %>% 
+  distinct(Samples, eitiology) %>% 
+  group_by(eitiology) %>% 
+  count()
+tissue_10count <- tissue_10count %>% 
+  rename(n_tissue = n) %>% 
+  mutate(perc_tissue = round(((n_tissue/190)*100), 2))
+tissue_10count_bind <- tissue_10count %>% mutate(study = "Schildkraut-B") %>% rename(perc = perc_tissue) %>% select(-c("n_tissue"))
+
+count_10 <- rbind(tcga_10count_bind, tissue_10count_bind)
+perc_count_10 <- merge(tcga_10count, tissue_10count)
+
+# Look at difference in the frequency between Schildkraut and TCGA
+perc_count_10 %>% mutate(diff = perc_tissue - perc_tcga)
+
+```
+
+# Figure 4A - Plot frequency of individuals with at least 10 mutations attributed to a given signature 
+
+```{r}
+
+count_10 <- count_10 %>% ungroup() %>% add_row(eitiology = "POLE", study = "TCGA-W", perc = 0.00000001) #So pole will show up as 0 in plot for TCGA
+
+Freq_comparison_plot <- 
+  count_10 %>% 
+  filter(eitiology %in% signatures_of_interest) %>%
+  filter(eitiology != "MMRD") %>%
+  mutate(order_var = ifelse(study == "Schildkraut-B", round(perc), 0)) %>%
+  mutate(perc_label = round(perc)) %>%
+  mutate(eitiology = factor(eitiology, levels = c("Age", "Artifact", "HRD", "Chemotherapy", "APOBEC", "POLE", "UV", "Immunosuppressants", "BER", "Tobacco", "AA", "Colibactin"))) %>%
+  ggplot(., aes(x = eitiology, y = perc_label)) +
+  geom_bar_pattern(position="dodge", stat="identity", aes(fill = eitiology, pattern=study),
+                   pattern_spacing = 0.01, pattern_fill="white", pattern_size = 0.5, pattern_density=0.5, pattern_linetype = 0.5) + 
+  scale_fill_manual(values = vc_cols) + 
+  scale_pattern_manual(values=c('none', 'stripe')) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, color = "black", size = 10, face = "bold"), 
+        axis.text.y = element_text(color = "black", size = 10), 
+        axis.title.y = element_text(color = "black", size = 10, hjust = .5, face = "bold"), 
+        legend.position = c(.9, .85),
+        legend.background=element_rect(fill = alpha("white", 0)), 
+        legend.text=element_text(size=10, face = "bold")
+        ) +
+  xlab("") +
+  ylab("Percent With Signature") +
+  guides(
+    fill = "none",  # Hide the fill legend
+    pattern = guide_legend(title = NULL)  # Display the pattern legend without a title
+  ) +
+  geom_text(aes(x = eitiology, y = perc_label, label = perc_label, fill = eitiology, pattern=study),
+            position = position_dodge(width = .9),    # move to center of bars
+            vjust = -0.5,    # nudge above top of bar
+            size = 3) + 
+  ylim(0, 50)
+```
+
+## TMB Plot Overall - Figure 4B
+
+```{r}
+
+sbs_tissue_black_merge <- sbs_tissue_black %>% mutate(study = "Schildkraut-B") %>% rename(perc = perc_sbs_tissue_black_exclude_mmrd) %>% select(c(eitiology, perc, study))
+sbs_tcga_white_merge <- sbs_tcga_white_nature %>% mutate(study = "TCGA-W") %>% rename(perc = perc_sbs_tcga_white_nature_exclude_mmrd) %>% select(c(eitiology, perc, study))
+cosmic_results_plotting <- rbind(sbs_tissue_black_merge, sbs_tcga_white_merge)
+study_cols = c("#660066", "#fdd969")
+names(study_cols) = c('Schildkraut-B', 'TCGA-W')
+
+#Proportion of TMB contributing to each signature
+tmb_plot <- 
+  cosmic_results_plotting %>% 
+  mutate(eitiology = ifelse(is.na(eitiology), "Not Available", eitiology),
+         eitiology = ifelse(eitiology == "Lymphoid", "Not Available", eitiology),
+         eitiology = factor(eitiology, levels = c("Not Available", "Tobacco", "BER", "Immunosuppressants", "UV", "POLE", "APOBEC", "Chemotherapy", "HRD", "Artifact", "Age")), 
+         study = factor(study, levels = c("TCGA-W", "Schildkraut-B"))) %>%
+  ggplot(., aes(x = perc, y = study)) +
+  geom_bar(position="stack", stat="identity", aes(fill = eitiology)) + 
+  scale_fill_manual(values = vc_cols) + 
+  scale_pattern_manual(values=c('stripe', 'none')) +
+  theme_bw() +
+  theme(axis.text.y = element_text(face = "bold", size = 10, color= "black"), axis.text.x = element_text(size = 10, color= "black"), 
+        axis.title.x = element_text(size = 10, color = "black", vjust = 0.5, face = "bold"), legend.position = "none") +
+  xlab("TMB %") +
+  ylab("") +
+  guides(fill = "none")
+
+
+
+```
+
+## Figure 4C
+
+```{r}
+
+#Define function that plots signature counts per sample filled by eitiology
+plot_cosmic <- function(df_long, exclude_signatures, signatures_list)
+{
+df_prepare <- 
+  df_long %>%
+  filter(!signature %in% {{exclude_signatures}} & eitiology %in% {{signatures_list}}) %>%
+  filter(!signature %in% c('SBS6', 'SBS14', 'SBS15', 'SBS20', 'SBS21', 'SBS26', 'SBS44')) %>%
+  filter(., activity > 0)
+total_activity <- 
+  df_prepare %>%
+  group_by(Samples) %>% 
+  summarise(total_activity = sum(activity)) %>%
+  arrange(desc(total_activity)) %>%
+  mutate(Samples = factor(Samples, levels = unique(Samples)))
+
+df <-  left_join(df_prepare, total_activity)
+df <- df %>% arrange(desc(total_activity)) %>%
+  mutate(Samples = factor(Samples, levels = unique(Samples)))
+
+plot <- 
+  ggplot(data=df, aes(x = Samples, y = activity, fill = eitiology)) + 
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = vc_cols) +
+  theme_bw() +
+  xlab(paste("Samples")) +
+  ylab("Mutation counts") +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(size = 10),
+        axis.title.x = element_text(size = 10), 
+        legend.position = "none") +
+  scale_y_continuous(limits = c(0, 750))
+return(plot)
+}
+
+cosmic_counts_tissue_black <- plot_cosmic(sbs_tissue_black_long, signatures_missing_tcga, all_signatures) + labs(title = "Schildkraut-B") + theme(plot.title = element_text(size = 10, face = "bold"))
+cosmic_counts_tcga_white <- plot_cosmic(sbs_tcga_white_nature_long, signatures_missing_tcga, all_signatures) + labs(title = "TCGA-W") + theme(plot.title = element_text(size = 10, face = "bold"))
+
+
+```
+
+## Make Figure 4
+
+```{r}
+
+Freq_comparison_plot_2 <- Freq_comparison_plot + theme(plot.margin = margin(0.5, 0, 0, 0.5, "cm"))
+tmb_plot_2 <- tmb_plot + theme(plot.margin = margin(0.5, 0, 0, 0.5, "cm"))
+cosmic_counts_tissue_black_2 <- cosmic_counts_tissue_black + theme(plot.margin = margin(0.5, 0, 0, 0.5, "cm"))
+cosmic_counts_tcga_white_2 <- cosmic_counts_tcga_white + theme(plot.margin = margin(0.5, 0, 0, 0.5, "cm"))
+
+figure3c <- ggarrange(cosmic_counts_tissue_black_2 + rremove("ylab") + rremove("xlab"), 
+                      cosmic_counts_tcga_white_2 + rremove("ylab") + rremove("xlab"), 
+                      nrow = 2)
+
+figure3c <- annotate_figure(figure3c, left = textGrob(expression(bold("Mutation Count")), rot = 90, vjust = 1, gp = gpar(cex = 1.3, fontsize = 8)),
+                    bottom = textGrob(expression(bold("Samples")), gp = gpar(cex = 1.3, fontsize = 8)))
+
+Figure_4_alt <- ggarrange(Freq_comparison_plot_2, tmb_plot_2, figure3c,
+                    labels = c("A", "B", "C"), heights = c(1.75, 1, 2), ncol = 1, nrow = 3)
+
+tiff(file.path(directory, "results/figures/Figure_4_cosmic_alt.tiff"), units="in", width=8, height=10, res=300)
+Figure_4_alt
+dev.off()
+
+```
+
+### Add in gene expression subtype data 
+
+```{r}
+
+all_results <- readxl::read_xlsx(file.path(directory, "results/all_results.xlsx"))
+rnaseq_tissue_merge <- all_results %>% 
+  rename(Samples = sample_id) %>% 
+  filter(Study == "Schildkraut-B") %>% 
+  select(Study, Samples, ClusterK4_kmeans)
+tissue_rna <- merge(sbs_tissue_black_long, rnaseq_tissue_merge)
+
+rnaseq_tcga_merge <- all_results %>% 
+  rename(Samples = sample_id) %>% 
+  filter(Study == "TCGA-W") %>% 
+  select(Study, Samples, ClusterK4_kmeans)
+tcga_rna <- merge(sbs_tcga_white_nature_long, rnaseq_tcga_merge)
+
+rna <- rbind(tissue_rna, tcga_rna)
+temp <- rna %>% group_by(Study, ClusterK4_kmeans, eitiology) %>% mutate_at(vars(ClusterK4_kmeans), as.factor)
+rna_plot <-
+  temp %>%
+  filter(!signature %in% c('SBS6', 'SBS14', 'SBS15', 'SBS20', 'SBS21', 'SBS26', 'SBS44')) %>%
+    group_by(Study, ClusterK4_kmeans, eitiology) %>% 
+    summarize(mutation_count = sum(activity)) %>% 
+    mutate(total_tmb = sum(mutation_count)) %>%
+    mutate(., perc = (mutation_count/total_tmb)*100)
+
+```
+
+# Define dataframe with the frequency of individuals in each gene expression subtype group with a given signature 
+
+```{r}
+
+### TCGA
+tcga_10count_rna <- 
+  tcga_rna %>%
+  filter(!signature %in% c('SBS6', 'SBS14', 'SBS15', 'SBS20', 'SBS21', 'SBS26', 'SBS44')) %>%
+  filter(activity > 9) %>% 
+  group_by(ClusterK4_kmeans, eitiology) %>% 
+  count()
+
+tcga_rna %>% distinct(Samples, ClusterK4_kmeans) %>% group_by(ClusterK4_kmeans) %>% tally()
+
+full_tcga <- tcga_rna %>% 
+  group_by(ClusterK4_kmeans, eitiology) %>% 
+  summarise(n = 0, perc = 0, study = "TCGA-W") %>% 
+  mutate_at(vars(n), as.integer)
+
+tcga_10count_rna <- tcga_10count_rna %>% 
+  mutate(perc = ifelse(ClusterK4_kmeans == "C1.MES", round((n/52)*100),
+                       ifelse(ClusterK4_kmeans == "C5.PRO", round((n/22)*100),
+                              ifelse(ClusterK4_kmeans == "C2.IMM", round((n/32)*100),
+                                     ifelse(ClusterK4_kmeans == "C4.DIF", round((n/53)*100))))),
+         study = "TCGA-W") 
+replace_tcga <-  anti_join(full_tcga, tcga_10count_rna, by = c("ClusterK4_kmeans", "eitiology"))
+tcga_10count_rna <- bind_rows(tcga_10count_rna, replace_tcga)
+
+###Schildkraut
+tissue_10count_rna <- tissue_rna %>%
+  filter(!signature %in% c('SBS6', 'SBS14', 'SBS15', 'SBS20', 'SBS21', 'SBS26', 'SBS44')) %>%
+  filter(activity > 9) %>% 
+  group_by(ClusterK4_kmeans, eitiology) %>% 
+  count()
+full_tissue <- tissue_rna %>% 
+  group_by(ClusterK4_kmeans, eitiology) %>% 
+  summarise(n = 0, perc = 0, study = "Schildkraut-B") %>% 
+  mutate_at(vars(n), as.integer)
+tissue_10count_rna <- tissue_10count_rna %>% 
+  mutate(perc = ifelse(ClusterK4_kmeans == "C1.MES", round((n/45)*100),
+                       ifelse(ClusterK4_kmeans == "C5.PRO", round((n/40)*100),
+                              ifelse(ClusterK4_kmeans == "C2.IMM", round((n/56)*100),
+                                     ifelse(ClusterK4_kmeans == "C4.DIF", round((n/2)*100))))),
+         study = "Schildkraut-B") 
+
+replace_tissue <-  anti_join(full_tissue, tissue_10count_rna, by = c("ClusterK4_kmeans", "eitiology"))
+tissue_10count_rna <- bind_rows(tissue_10count_rna, replace_tissue)
+
+### Join TCGA and Schildkraut-B
+count_10_rna <- rbind(tissue_10count_rna, tcga_10count_rna)
+
+```
+
+## Figure 5A    
+
+```{r}
+
+Freq_comparison_plot_rna_C1MES <- 
+  count_10_rna %>%
+  filter(ClusterK4_kmeans == "C1.MES" & eitiology %in% c("Age", "Artifact", "HRD", "Chemotherapy", "APOBEC", "POLE", "UV", "Immunosuppressants", "BER", "Tobacco", "AA", "Colibactin")) %>%
+  mutate(eitiology = factor(eitiology, levels = c("Age", "Artifact", "HRD", "Chemotherapy", "APOBEC", "POLE", "UV", "Immunosuppressants", "BER", "Tobacco", "AA", "Colibactin"))) %>%
+  ggplot(., aes(x = eitiology, y = perc)) +
+  geom_bar_pattern(position="dodge", stat="identity", aes(fill = eitiology, pattern=study),
+                   pattern_spacing = 0.01, pattern_fill="white", pattern_size = 0.5, pattern_density=0.5, pattern_linetype = 0.5) + 
+  scale_fill_manual(values = vc_cols) + 
+  scale_pattern_manual(labels=c('Schildkraut-B (n=45)', 'TCGA-W (n=52)'), values=c('none', 'stripe')) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(color = "black", size = 10),
+    axis.title.y = element_text(color = "black", size = 10, hjust = .5, face = "bold"),
+    legend.position = c(.8, .85),
+    legend.background=element_rect(fill = alpha("white", 0)),
+    legend.text=element_text(size=10, face = "bold"), 
+    plot.title = element_text(size = 10, face = "bold")
+        ) +
+  xlab("") +
+  ylab("Percent With Signature") +
+  labs(title = "C1.MES") +
+  ylim(0, 60) + 
+  guides(
+    fill = "none",  # Hide the fill legend
+    pattern = guide_legend(title = NULL)  # Display the pattern legend without a title
+  ) 
+
+
+Freq_comparison_plot_rna_PRO <- 
+  count_10_rna %>% 
+  filter(ClusterK4_kmeans == "C5.PRO" & eitiology %in% c("Age", "Artifact", "HRD", "Chemotherapy", "APOBEC", "POLE", "UV", "Immunosuppressants", "BER", "Tobacco", "AA", "Colibactin")) %>%
+  mutate(eitiology = factor(eitiology, levels = c("Age", "Artifact", "HRD", "Chemotherapy", "APOBEC", "POLE", "UV", "Immunosuppressants", "BER", "Tobacco", "AA", "Colibactin"))) %>%
+  ggplot(., aes(x = eitiology, y = perc)) +
+  geom_bar_pattern(position="dodge", stat="identity", aes(fill = eitiology, pattern=study),
+                   pattern_spacing = 0.01, pattern_fill="white", pattern_size = 0.5, pattern_density=0.5, pattern_linetype = 0.5) + 
+  scale_fill_manual(values = vc_cols) + 
+  scale_pattern_manual(labels=c('Schildkraut-B (n=40)', 'TCGA-W (n=22)'), values=c('none', 'stripe')) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, color = "black", size = 10), 
+        axis.text.y = element_text(color = "black", size = 10), 
+        axis.title.y = element_text(color = "black", size = 10, hjust = .5, face = "bold"), 
+        legend.position = c(.8, .85),
+        legend.background=element_rect(fill = alpha("white", 0)), 
+        legend.text=element_text(size=10, face = "bold"), 
+        plot.title = element_text(size = 10, face = "bold")
+        ) +
+  xlab("") +
+  ylab("Percent With Signature") +
+  labs(title = "C5.PRO") +
+  ylim(0, 60) +
+  guides(
+    fill = "none",  # Hide the fill legend
+    pattern = guide_legend(title = NULL)  # Display the pattern legend without a title
+  ) 
+
+Freq_comparison_plot_rna_immuno <- 
+  count_10_rna %>% 
+  filter(ClusterK4_kmeans == "C2.IMM" & eitiology %in% c("Age", "Artifact", "HRD", "Chemotherapy", "APOBEC", "POLE", "UV", "Immunosuppressants", "BER", "Tobacco", "AA", "Colibactin")) %>%
+  mutate(eitiology = factor(eitiology, levels = c("Age", "Artifact", "HRD", "Chemotherapy", "APOBEC", "POLE", "UV", "Immunosuppressants", "BER", "Tobacco", "AA", "Colibactin"))) %>%
+  ggplot(., aes(x = eitiology, y = perc)) +
+  geom_bar_pattern(position="dodge", stat="identity", aes(fill = eitiology, pattern=study),
+                   pattern_spacing = 0.01, pattern_fill="white", pattern_size = 0.5, pattern_density=0.5, pattern_linetype = 0.5) + 
+  scale_fill_manual(values = vc_cols) + 
+  scale_pattern_manual(labels=c('Schildkraut-B (n=56)', 'TCGA-W (n=32)'), values=c('none', 'stripe')) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(), 
+        axis.text.y = element_text(color = "black", size = 10), 
+        axis.title.y = element_text(color = "black", size = 10, hjust = .5, face = "bold"), 
+        legend.position = c(.8, .8),
+        legend.background=element_rect(fill = alpha("white", 0)), 
+        legend.text=element_text(size=8, face = "bold"),
+        legend.key.size = unit(.5, "cm"), 
+        plot.title = element_text(size = 10, face = "bold")
+        ) +
+  xlab("") +
+  ylab("Percent With Signature") +
+  labs(title = "C2.IMM") +
+  ylim(0, 60) +
+  guides(
+    fill = "none",  # Hide the fill legend
+    pattern = guide_legend(title = NULL)  # Display the pattern legend without a title
+  ) 
+
+Freq_comparison_plot_rna_diff <- 
+  count_10_rna %>% 
+  filter(ClusterK4_kmeans == "C4.DIF" & eitiology %in% c("Age", "Artifact", "HRD", "Chemotherapy", "APOBEC", "POLE", "UV", "Immunosuppressants", "BER", "Tobacco", "AA", "Colibactin")) %>%
+  mutate(eitiology = factor(eitiology, levels = c("Age", "Artifact", "HRD", "Chemotherapy", "APOBEC", "POLE", "UV", "Immunosuppressants", "BER", "Tobacco", "AA", "Colibactin"))) %>%
+  ggplot(., aes(x = eitiology, y = perc)) +
+  geom_bar_pattern(position="dodge", stat="identity", aes(fill = eitiology, pattern=study),
+                   pattern_spacing = 0.01, pattern_fill="white", pattern_size = 0.5, pattern_density=0.5, pattern_linetype = 0.5) + 
+  scale_fill_manual(values = vc_cols) + 
+  scale_pattern_manual(labels=c('Schildkraut-B (n=2)', 'TCGA-W (n=53)'), values=c('none', 'stripe')) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, color = "black", size = 10), 
+        axis.text.y = element_text(color = "black", size = 10, face = "bold"), 
+        axis.title.y = element_text(color = "black", size = 10, hjust = .5, face = "bold"), 
+        legend.position = c(.8, .85),
+        legend.background=element_rect(fill = alpha("white", 0)), 
+        legend.text=element_text(size=10, face = "bold"), 
+        plot.title = element_text(size = 10, face = "bold")
+        ) +
+  xlab("") +
+  ylab("Percent With Signature") +
+  ylim(0, 60) + 
+  labs(title = "C4.DIF") +
+  guides(
+    fill = "none",  # Hide the fill legend
+    pattern = guide_legend(title = NULL)  # Display the pattern legend without a title
+  ) 
+
+Freq_comparison_plot_rna_C1MES <- Freq_comparison_plot_rna_C1MES + theme(legend.position = "none")
+Freq_comparison_plot_rna_PRO <- Freq_comparison_plot_rna_PRO + theme(legend.position = "none")
+Freq_comparison_plot_rna_diff <- Freq_comparison_plot_rna_diff + theme(legend.position = "none")
+
+Figure5a <- ggarrange(Freq_comparison_plot_rna_C1MES + rremove("ylab"), 
+                      Freq_comparison_plot_rna_immuno + rremove("ylab"), 
+                      Freq_comparison_plot_rna_PRO + rremove("ylab"), 
+                      Freq_comparison_plot_rna_diff + rremove("ylab"), 
+                      nrow = 2, ncol = 2, heights = c(1, 1.6, 1, 1.6))
+
+Figure5a <- annotate_figure(Figure5a, left = textGrob(expression(bold("Percent With Signature")), rot = 90, vjust = 1, hjust = 0, gp = gpar(cex = 1, fontsize = 10)))
+
+
+```
+
+### Figure 5B
+
+```{r}
+
+tmb_perc_tissue <- 
+  rna_plot %>% 
+  filter(Study == "Schildkraut-B") %>%
+  mutate(ClusterK4_kmeans = recode(ClusterK4_kmeans, "C1.MES" = "C1.MES n=45", "C5.PRO" = "C5.PRO n=40", "C2.IMM" = "C2.IMM n=56", "C4.DIF" = "C4.DIF n=2")) %>%
+  mutate(eitiology = ifelse(is.na(eitiology), "Not Available", eitiology),
+         eitiology = ifelse(eitiology == "Lymphoid", "Not Available", eitiology),
+         eitiology = factor(eitiology, levels = c("Not Available", "Tobacco", "BER", "Immunosuppressants", "UV", "POLE", "APOBEC", "Chemotherapy", "HRD", "Artifact", "Age")), 
+         ClusterK4_kmeans = factor(ClusterK4_kmeans, levels = c("C4.DIF n=2", "C2.IMM n=56", "C5.PRO n=40", "C1.MES n=45"))) %>%
+  ggplot(., aes(x = perc, y = ClusterK4_kmeans)) +
+  geom_bar_pattern(position="stack", stat="identity", aes(fill = eitiology, pattern=Study),
+                   pattern_spacing = 0.009, pattern_fill="white", pattern_size = 0.5, pattern_density=0.2, pattern_linetype = 0.5) + 
+  scale_fill_manual(values = vc_cols) + 
+  scale_pattern_manual(values=c('none', 'stripe')) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 10, color= "black"), axis.ticks.y = element_blank(), axis.text.x = element_text(size = 10, color= "black"), axis.title.x = element_text(size = 10, color = "black", vjust = 0.5), legend.position = "none") +
+  xlab("TMB %") +
+  ylab("") +
+  guides(
+    fill = "none",  # Hide the fill legend
+    pattern = guide_legend(title = NULL)  # Display the pattern legend without a title
+  )
+
+# Tissue_plot <- ggarrange(tmb_tissue, tmb_perc_tissue, widths = c(1, 1.90))
+rna_plot %>% filter(Study == "TCGA-W") %>% pull(ClusterK4_kmeans) %>% unique()
+
+tmb_perc_tcga <- 
+  rna_plot %>% 
+  filter(Study == "TCGA-W") %>%
+  mutate(ClusterK4_kmeans = recode(ClusterK4_kmeans, "C1.MES" = "C1.MES n=52", "C5.PRO" = "C5.PRO n=22", 
+                                   "C2.IMM" = "C2.IMM n=32", "C4.DIF" = "C4.DIF n=53")) %>%
+  mutate(eitiology = ifelse(is.na(eitiology), "Not Available", eitiology),
+         eitiology = ifelse(eitiology == "Lymphoid", "Not Available", eitiology),
+         eitiology = factor(eitiology, levels = c("Not Available", "Tobacco", "BER", "Immunosuppressants", "UV", "POLE", "APOBEC", "Chemotherapy", "HRD", "Artifact", "Age")),
+         ClusterK4_kmeans = factor(ClusterK4_kmeans, levels = c("C4.DIF n=53", "C2.IMM n=32", "C5.PRO n=22", "C1.MES n=52"))) %>%
+  ggplot(., aes(x = perc, y = ClusterK4_kmeans)) +
+  geom_bar_pattern(position="stack", stat="identity", aes(fill = eitiology, pattern=Study),
+                   pattern_spacing = 0.009, pattern_fill="white", pattern_size = 0.5, pattern_density=0.2, pattern_linetype = 0.5) + 
+  scale_fill_manual(values = vc_cols) + 
+  scale_pattern_manual(values=c('none', 'stripe')) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 10, color= "black"), axis.ticks.y = element_blank(), axis.text.x = element_text(size = 10, color= "black"), axis.title.x = element_text(size = 10, color = "black", vjust = 0.5), legend.position = "none") +
+  xlab("TMB %") +
+  ylab("") +
+  guides(
+    fill = "none",  # Hide the fill legend
+    pattern = guide_legend(title = NULL)  # Display the pattern legend without a title
+  )
+
+tmb_perc_tissue <- tmb_perc_tissue + labs(title = "Schildkraut-B") + theme(plot.title = element_text(size = 10, face = "bold")) + rremove("ylab")
+tmb_perc_tcga <- tmb_perc_tcga + labs(title = "TCGA-W") + theme(plot.title = element_text(size = 10, face = "bold")) 
+Figure5b <- ggarrange(tmb_perc_tissue + rremove("xlab"), tmb_perc_tcga + rremove("xlab"))
+Figure5b <- annotate_figure(Figure5b, bottom = textGrob(expression(bold("TMB %")), vjust = 1, hjust = 0, gp = gpar(cex = 1, fontsize = 10)))
+
+
+
+```
+
+## Figure 5C 
+
+```{r}
+
+plot_cosmic_updated <- function(df_long, exclude_signatures, signatures_list)
+{
+df_prepare <- 
+  df_long %>%
+  filter(!signature %in% {{exclude_signatures}} & eitiology %in% {{signatures_list}}) %>%
+  filter(., activity > 0)
+total_activity <- 
+  df_prepare %>%
+  group_by(ClusterK4_kmeans, Samples) %>% 
+  summarise(total_activity = sum(activity)) %>%
+  arrange(ClusterK4_kmeans, desc(total_activity)) %>%
+  mutate(Samples = factor(Samples, levels = unique(Samples)))
+
+df <-  left_join(df_prepare, total_activity)
+df <- df %>% arrange(desc(total_activity)) %>%
+  arrange(ClusterK4_kmeans, desc(total_activity)) %>%
+  mutate(Samples = factor(Samples, levels = unique(Samples)))
+
+plot <- ggplot(data=df, aes(x = Samples, y = activity, fill = eitiology)) + 
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = vc_cols) +
+  theme_bw() +
+  xlab(paste("Samples")) +
+  ylab("Mutation counts") +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_text(size = 10),
+        axis.title.x = element_text(size = 10), 
+        legend.position = "none") +
+  scale_y_continuous(limits = c(0, 750)) + 
+  facet_grid(.~ClusterK4_kmeans, scales="free", space = "free", switch="both")
+return(plot)
+}
+
+
+tissue_rna <- tissue_rna %>% filter(!signature %in% c('SBS6', 'SBS14', 'SBS15', 'SBS20', 'SBS21', 'SBS26', 'SBS44'))
+tcga_rna <- tcga_rna %>% filter(!signature %in% c('SBS6', 'SBS14', 'SBS15', 'SBS20', 'SBS21', 'SBS26', 'SBS44'))
+
+
+tissue_rna <- tissue_rna %>% mutate(ClusterK4_kmeans = factor(ClusterK4_kmeans, levels = c("C1.MES", "C5.PRO", "C2.IMM", "C4.DIF")))
+tissue_rna <- tissue_rna %>% filter(!is.na(ClusterK4_kmeans))
+tcga_rna <- tcga_rna %>% mutate(ClusterK4_kmeans = factor(ClusterK4_kmeans, levels = c("C1.MES", "C5.PRO", "C2.IMM", "C4.DIF")))
+tcga_rna <- tcga_rna %>% filter(!is.na(ClusterK4_kmeans))
+
+tmb_counts_rna_tissue <- plot_cosmic_updated(tissue_rna, signatures_missing_tcga, all_signatures) + theme(plot.margin = margin(1, 0.5, 0.5, 0.5, "cm"))
+tmb_counts_rna_tcga <- plot_cosmic_updated(tcga_rna, signatures_missing_tcga, all_signatures) + theme(plot.margin = margin(1, 0.5, 0.5, 0.5, "cm"))
+
+Figure5c <- ggarrange(tmb_counts_rna_tissue, tmb_counts_rna_tcga, labels = c("Schildkraut-B", "TCGA-W"), nrow = 2, hjust = 0)
+
+
+tmb_counts_rna_tissue <- tmb_counts_rna_tissue + labs(title = "Schildkraut-B") + theme(plot.title = element_text(size = 10, face = "bold"))
+tmb_counts_rna_tcga <- tmb_counts_rna_tcga + labs(title = "TCGA-W") + theme(plot.title = element_text(size = 10, face = "bold"))
+Figure5c <- ggarrange(tmb_counts_rna_tissue + rremove("ylab") + rremove("xlab"), 
+                      tmb_counts_rna_tcga + rremove("ylab") + rremove("xlab"), 
+                      nrow = 2)
+Figure5c <- annotate_figure(Figure5c, left = textGrob(expression(bold("Mutation Count")), rot = 90, vjust = 1, gp = gpar(cex = 1.3, fontsize = 8)),
+                    bottom = textGrob(expression(bold("Samples")), gp = gpar(cex = 1.3, fontsize = 8)))
+
+
+```
+
+
+
+```{r}
+
+tiff(file.path(directory, "results/figures/Figure5.tiff"), units="in", width=8, height=10, res=300)
+
+ggarrange(Figure5a, Figure5b, Figure5c, nrow = 3, heights = c(3, 1, 3), labels = c("A", "B", "C"))
+
+dev.off()
+
+```
+
+
