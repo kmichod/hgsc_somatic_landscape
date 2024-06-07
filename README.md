@@ -5,8 +5,11 @@ This repository contains all the code needed to recreate the analyses, tables, a
 The processed data used in this analysis is included in the publication. Raw data will be made available through dbGaP under study ID: phs002262.v3.p1.
 
 ## Code Overview
-*data: This is an empty folder, once the paper is published, we will release the processed data which can be put here.
-*reference_data: This is an empty folder, once the paper is published, we will release the supplemental data needed to perform analyses and the metadata files.
-*programs: This includes the programs (USeq (VCF parser), COSMIC, VCF2MAF, and quality filtering) used to generated the processed data in this manuscript.
-*code: Code used to analyze the data after variant calling, VCF parsing, and quality filtering and code used to generate main figures and tables in the manuscript.
+-data: This is an empty folder, once the paper is published, we will release the processed data which can be put here.
+
+-reference_data: This is an empty folder, once the paper is published, we will release the supplemental data needed to perform analyses and the metadata files.
+
+-programs: This includes the programs (USeq (VCF parser), COSMIC, VCF2MAF, and quality filtering) used to generated the processed data in this manuscript.
+
+-code: Code used to analyze the data after variant calling, VCF parsing, and quality filtering and code used to generate main figures and tables in the manuscript.
 
